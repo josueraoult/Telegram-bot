@@ -23,7 +23,7 @@ WELCOME_MSG = """
 /help - Affiche ce message
 /uptime - Voir le temps de fonctionnement
 /request [raison] - Demander les droits admin
-/admin-list - Liste des admins (admin seulement)
+/adminlist - Liste des admins (admin seulement)
 """
 
 ADMIN_MSG = """
@@ -258,7 +258,7 @@ def main():
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("uptime", uptime))
     app.add_handler(CommandHandler("request", request_admin))
-    app.add_handler(CommandHandler("admin-list", admin_list))
+    app.add_handler(CommandHandler("adminlist", admin_list))  # Changé de admin-list à adminlist
     
     # Commandes admin
     app.add_handler(CommandHandler("approve", approve_request))
