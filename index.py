@@ -9,61 +9,19 @@ import os
 
 BOT_TOKEN = "7059448299:AAGTyg3EIlnQNe91LH49yWojUjHLj9HPqx4"
 
-# Fichier pour stocker les admins
 ADMIN_FILE = "admins.json"
-PRIMARY_ADMIN = 123456789  # Ton ID principal ici
-
+PRIMARY_ADMIN = 7059448299  # Mets ton vrai ID ici si c’est autre chose
 start_time = time.time()
 
 WELCOME_MESSAGE = """
 ━━━━━━━━━━━━━━
-🌟 Available Educational Commands:
+🌟 Commandes disponibles :
 ╭─╼━━━━━━━━╾─╮
-│ - ai
-│ - lyrics
+│ /help - Aide
+│ /uptime - Temps actif
+│ /admin - Gérer les admins
+│ /notify - Message à tous les admins
 ╰─━━━━━━━━━╾─╯
-
-🌟 Available Other Commands:
-╭─╼━━━━━━━━╾─╮
-│ - anime
-│ - imagine
-│ - ipinfo
-│ - manga
-│ - sing
-│ - advice
-│ - aniquotes
-│ - bored
-│ - cat
-│ - define
-│ - dog
-│ - emogif
-│ - emojimix
-│ - fbd
-│ - gemini
-│ - guessnumber
-│ - gojo
-│ - gpt
-│ - gpt4
-│ - help
-│ - horoscope
-│ - imgur
-│ - joke
-│ - meme
-│ - music
-│ - ocr
-│ - p
-│ - password
-│ - pinterest
-│ - quote
-│ - randomfact
-│ - shorten
-│ - tikd
-│ - tiktok
-│ - translate
-│ - trivia
-╰─━━━━━━━━━╾─╯
-Never forget, Stanley stawa is handsome
-📩 Type help [command name] to see command details.
 ━━━━━━━━━━━━━━
 """
 
@@ -79,12 +37,13 @@ def save_admins(admins):
         json.dump(admins, f)
 
 ADMINS = load_admins()
+PENDING_REMOVALS = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(WELCOME_MESSAGE)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Tape juste une commande pour l’utiliser !")
+    await update.message.reply_text(WELCOME_MESSAGE)
 
 async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uptime_seconds = int(time.time() - start_time)
@@ -98,12 +57,14 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not context.args:
-        await update.message.reply_text("Usage: admin [add/remove/list] [ID]")
+        await update.message.reply_text("Usage: /admin [add/remove/list] [ID]")
         return
 
     cmd = context.args[0]
     if cmd == "list":
-        text = "Admins:\n" + "\n".join([f"- {aid}" + (" (principal)" if aid == PRIMARY_ADMIN else "") for aid in ADMINS])
+        text = "Admins:\n" + "\n".join(
+            [f"- {aid}" + (" (principal)" if aid == PRIMARY_ADMIN else "") for aid in ADMINS]
+        )
         await update.message.reply_text(text)
 
     elif cmd == "add" and len(context.args) >= 2:
@@ -112,7 +73,7 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if new_id not in ADMINS:
                 ADMINS.append(new_id)
                 save_admins(ADMINS)
-                await update.message.reply_text(f"Ajouté admin: {new_id}")
+                await update.message.reply_text(f"Admin ajouté: {new_id}")
             else:
                 await update.message.reply_text("Cet ID est déjà admin.")
         except:
@@ -124,14 +85,14 @@ async def admin_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if rem_id == PRIMARY_ADMIN:
                 await update.message.reply_text("Impossible de supprimer l’admin principal.")
             elif rem_id in ADMINS:
-                ADMINS.remove(rem_id)
-                save_admins(ADMINS)
-                await update.message.reply_text(f"Supprimé admin: {rem_id}")
+                PENDING_REMOVALS[user_id] = rem_id
+                await update.message.reply_text(
+                    f"Es-tu sûr de vouloir supprimer {rem_id} ? Réponds par 'oui' ou 'non'."
+                )
             else:
                 await update.message.reply_text("Cet ID n’est pas admin.")
         except:
             await update.message.reply_text("ID invalide.")
-
     else:
         await update.message.reply_text("Commande invalide. Utilise: add, remove, list")
 
@@ -145,7 +106,7 @@ async def notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = " ".join(context.args)
         for admin_id in ADMINS:
             try:
-                await context.bot.send_message(chat_id=admin_id, text=f"Admin Notification:\n{message}")
+                await context.bot.send_message(chat_id=admin_id, text=f"[Notification admin]\n{message}")
             except:
                 pass
         await update.message.reply_text("Notification envoyée aux admins.")
@@ -154,6 +115,21 @@ async def notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.lower()
+    user_id = update.message.from_user.id
+
+    if user_id in PENDING_REMOVALS:
+        if text == "oui":
+            rem_id = PENDING_REMOVALS.pop(user_id)
+            ADMINS.remove(rem_id)
+            save_admins(ADMINS)
+            await update.message.reply_text(f"Admin {rem_id} supprimé.")
+        elif text == "non":
+            PENDING_REMOVALS.pop(user_id)
+            await update.message.reply_text("Suppression annulée.")
+        else:
+            await update.message.reply_text("Réponds avec 'oui' ou 'non'.")
+        return
+
     if text == "help":
         await help_command(update, context)
     elif text == "uptime":
@@ -161,7 +137,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif text == "admin":
         await admin_handler(update, context)
 
-async def main():
+def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -172,7 +148,7 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
 
     print("Bot lancé...")
-    await app.run_polling()
+    app.run_polling()
 
-import asyncio
-asyncio.run(main())
+if __name__ == "__main__":
+    main()
