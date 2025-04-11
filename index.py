@@ -15,13 +15,14 @@ from telegram.ext import (
 BOT_TOKEN = "7059448299:AAGTyg3EIlnQNe91LH49yWojUjHLj9HPqx4"
 ADMIN_FILE = "admins.json"
 REQUEST_FILE = "requests.json"
-PRIMARY_ADMIN = 7059448299  # Remplacez par votre ID admin principal
+PRIMARY_ADMIN = 6100575282  # Remplacez par votre ID admin principal
 
 # Messages
 WELCOME_MSG = """
 🌟 Commandes disponibles :
 /help - Affiche ce message
 /uptime - Voir le temps de fonctionnement
+/uid - Afficher votre ID Telegram
 /request [raison] - Demander les droits admin
 /adminlist - Liste des admins (admin seulement)
 """
@@ -66,6 +67,17 @@ async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uptime_sec = int(time.time() - bot_start_time)
     hours, mins, secs = uptime_sec//3600, (uptime_sec%3600)//60, uptime_sec%60
     await update.message.reply_text(f"⏱ Uptime: {hours}h {mins}m {secs}s")
+
+async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.message.from_user
+    await update.message.reply_text(
+        f"🔍 Vos informations :\n"
+        f"👤 Nom : {user.full_name}\n"
+        f"🆔 ID : <code>{user.id}</code>\n"
+        f"📛 Username : @{user.username if user.username else 'N/A'}\n\n"
+        f"Cet ID est utile pour les demandes admin.",
+        parse_mode='HTML'
+    )
 
 async def admin_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.from_user.id not in ADMINS:
@@ -257,8 +269,9 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("uptime", uptime))
+    app.add_handler(CommandHandler("uid", get_user_id))  # Nouvelle commande uid
     app.add_handler(CommandHandler("request", request_admin))
-    app.add_handler(CommandHandler("adminlist", admin_list))  # Changé de admin-list à adminlist
+    app.add_handler(CommandHandler("adminlist", admin_list))
     
     # Commandes admin
     app.add_handler(CommandHandler("approve", approve_request))
