@@ -71,17 +71,23 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("Fonctionnalité en maintenance.\n👨‍🔧👩‍💻", reply_markup=MENU_KEYBOARD)
     elif query.data == "help":
         await help_cmd(update, context)
-
 # GPT4o traitement texte
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if USER_STATES.get(user_id) == "gpt":
         ask = update.message.text
-        response = requests.post("https://jonell01-ccprojectsapihshs.hf.space/api/deepseek-r1", json={"ask": ask})
-        result = response.json().get("answer", "Erreur API")
-        if result.startswith('"') and result.endswith('"'):
-            result = result[1:-1]
-        await update.message.reply_text(result)
+        try:
+            response = requests.post(
+                "https://jonell01-ccprojectsapihshs.hf.space/api/deepseek-r1",
+                json={"ask": ask}
+            )
+            result = response.text.strip()
+            # Supprimer guillemets autour si présents
+            if result.startswith('"') and result.endswith('"'):
+                result = result[1:-1]
+            await update.message.reply_text(result)
+        except Exception as e:
+            await update.message.reply_text(f"Erreur de requête : {str(e)}")
         USER_STATES[user_id] = None
 
 # Ghibli : traitement image avec upload Catbox
