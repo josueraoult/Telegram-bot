@@ -78,7 +78,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ask = update.message.text
         try:
             response = requests.post(
-                "https://jonell01-ccprojectsapihshs.hf.space/api/deepseek-r1",
+                "https://jonell01-ccprojectsapihshs.hf.space/api/bard?",
                 json={"ask": ask}
             )
             result = response.text.strip()
@@ -149,7 +149,11 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    # Webhook mode pour Render
+    port = int(os.environ.get("PORT", 8443))
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path=BOT_TOKEN,
+        webhook_url=f"https://telegram-bot-ycfh.onrender.com/{BOT_TOKEN}"
+    )
