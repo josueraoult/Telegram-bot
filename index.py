@@ -52,7 +52,6 @@ def save_data(data, filename: str):
 ADMINS = load_data(ADMIN_FILE, [PRIMARY_ADMIN])
 REQUESTS = load_data(REQUEST_FILE, {})
 
-# Menu
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type == "private":
         await update.message.reply_text("Bienvenue ! Choisis une option :", reply_markup=MENU_KEYBOARD)
@@ -80,10 +79,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ask = update.message.text
         response = requests.post("https://jonell01-ccprojectsapihshs.hf.space/api/deepseek-r1", json={"ask": ask})
         result = response.json().get("answer", "Erreur API")
+        if result.startswith('"') and result.endswith('"'):
+            result = result[1:-1]
         await update.message.reply_text(result)
         USER_STATES[user_id] = None
 
-# Ghibli : traitement image
+# Ghibli : traitement image avec upload Catbox
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if USER_STATES.get(user_id) == "ghibli":
@@ -91,18 +92,27 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_path = f"{user_id}_image.jpg"
         await photo_file.download_to_drive(photo_path)
 
+        # Upload à Catbox Moe
         with open(photo_path, "rb") as f:
-            response = requests.post("https://jonell01-ccprojectsapihshs.hf.space/api/ghibli?url=", files={"image": f})
-            if response.status_code == 200:
-                with open(f"{user_id}_ghibli.jpg", "wb") as out:
-                    out.write(response.content)
-                await update.message.reply_photo(photo=open(f"{user_id}_ghibli.jpg", "rb"))
-            else:
-                await update.message.reply_text("Erreur lors de la génération d'image.")
+            files = {'fileToUpload': f}
+            data = {'reqtype': 'fileupload'}
+            r = requests.post("https://catbox.moe/user/api.php", data=data, files=files)
+            image_url = r.text.strip()
+
+        # Envoie à l'API Ghibli avec URL directe
+        ghibli_api_url = f"https://jonell01-ccprojectsapihshs.hf.space/api/ghibli?url={image_url}&type=direct"
+        response = requests.get(ghibli_api_url)
+
+        if response.status_code == 200:
+            ghibli_path = f"{user_id}_ghibli.jpg"
+            with open(ghibli_path, "wb") as out:
+                out.write(response.content)
+            await update.message.reply_photo(photo=open(ghibli_path, "rb"))
+        else:
+            await update.message.reply_text("Erreur lors de la génération d'image.")
 
         USER_STATES[user_id] = None
 
-# Aide
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = WELCOME_MSG
@@ -110,13 +120,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "\n🔧 Commandes Admin : /approve /reject /requests /notify /admin"
     await update.effective_chat.send_message(text, reply_markup=MENU_KEYBOARD)
 
-# Uptime
 async def uptime(update: Update, context: ContextTypes.DEFAULT_TYPE):
     uptime_sec = int(time.time() - bot_start_time)
     h, m, s = uptime_sec // 3600, (uptime_sec % 3600) // 60, uptime_sec % 60
     await update.message.reply_text(f"⏱ Uptime: {h}h {m}m {s}s")
 
-# UID
 async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.message.from_user
     await update.message.reply_text(
