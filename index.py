@@ -13,7 +13,9 @@ from telegram.ext import (
     ContextTypes,
 )
 
+# Config
 BOT_TOKEN = "7059448299:AAGTyg3EIlnQNe91LH49yWojUjHLj9HPqx4"
+GEMINI_API_KEY = "AIzaSyAArErZGDDJx7DJwExgY_pPWmN7Tjai8nk"
 ADMIN_FILE = "admins.json"
 REQUEST_FILE = "requests.json"
 PRIMARY_ADMIN = 6100575282
@@ -52,6 +54,28 @@ def save_data(data, filename: str):
 ADMINS = load_data(ADMIN_FILE, [PRIMARY_ADMIN])
 REQUESTS = load_data(REQUEST_FILE, {})
 
+# Fonction pour interroger l'API Gemini
+def get_gemini_response(user_input: str) -> str:
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": user_input}]
+                }
+            ]
+        }
+        headers = {"Content-Type": "application/json"}
+
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        data = response.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        print("❌ Erreur Gemini API:", e)
+        return "⚠️ Erreur lors de la connexion à l'IA."
+
+# Handlers
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.chat.type == "private":
         await update.message.reply_text("Bienvenue ! Choisis une option :", reply_markup=MENU_KEYBOARD)
@@ -71,26 +95,17 @@ async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("Fonctionnalité en maintenance.\n👨‍🔧👩‍💻", reply_markup=MENU_KEYBOARD)
     elif query.data == "help":
         await help_cmd(update, context)
+
 # GPT4o traitement texte
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if USER_STATES.get(user_id) == "gpt":
         ask = update.message.text
-        try:
-            response = requests.post(
-                "https://jonell01-ccprojectsapihshs.hf.space/api/bard?",
-                json={"ask": ask}
-            )
-            result = response.text.strip()
-            # Supprimer guillemets autour si présents
-            if result.startswith('"') and result.endswith('"'):
-                result = result[1:-1]
-            await update.message.reply_text(result)
-        except Exception as e:
-            await update.message.reply_text(f"Erreur de requête : {str(e)}")
+        result = get_gemini_response(ask)
+        await update.message.reply_text(result)
         USER_STATES[user_id] = None
 
-# Ghibli : traitement image avec upload Catbox
+# Ghibli traitement image
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     if USER_STATES.get(user_id) == "ghibli":
@@ -98,14 +113,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         photo_path = f"{user_id}_image.jpg"
         await photo_file.download_to_drive(photo_path)
 
-        # Upload à Catbox Moe
         with open(photo_path, "rb") as f:
             files = {'fileToUpload': f}
             data = {'reqtype': 'fileupload'}
             r = requests.post("https://catbox.moe/user/api.php", data=data, files=files)
             image_url = r.text.strip()
 
-        # Envoie à l'API Ghibli avec URL directe
         ghibli_api_url = f"https://jonell01-ccprojectsapihshs.hf.space/api/ghibli?url={image_url}&type=direct"
         response = requests.get(ghibli_api_url)
 
@@ -138,6 +151,7 @@ async def get_user_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode='HTML'
     )
 
+# Lancement du bot
 def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
@@ -149,11 +163,15 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
-    # Webhook mode pour Render
+    # Serveur Webhook (Render)
     port = int(os.environ.get("PORT", 8443))
+    print(f"🚀 Serveur Telegram lancé sur le port {port}")
     app.run_webhook(
         listen="0.0.0.0",
         port=port,
         url_path=BOT_TOKEN,
         webhook_url=f"https://telegram-bot-ycfh.onrender.com/{BOT_TOKEN}"
     )
+
+if __name__ == "__main__":
+    main()
